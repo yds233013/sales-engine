@@ -128,9 +128,9 @@ destructive reseed would protect nothing and would take the site down for its du
 every case id each night. (Links by reference, such as `/cases/REQ-2041`, survive a reseed; links
 by id do not.)
 
-The Railway service is still named `poka-sales-engine` and the local database is still
-`poka_sales_engine`: those are infrastructure identifiers, and renaming them would mean recreating
-the service or the database for no functional gain.
+The Railway service id is `poka-sales-engine`, a name kept from before the project was renamed;
+the commands below use it because they must match the deployed service. Renaming it would mean
+recreating the service for no functional gain.
 
 **Manual reset**, if it is ever needed. The database has no public endpoint, so the reset runs
 inside the deploy pipeline and only the Railway project owner can trigger it. From a clone linked

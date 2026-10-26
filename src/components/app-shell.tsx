@@ -87,7 +87,7 @@ export function AppShell({
           title="Sales Engine — AI Technical Sales Operations"
         >
           <span className="flex size-6 shrink-0 items-center justify-center rounded-[5px] bg-white text-[11px] font-bold tracking-tight text-[var(--rail)]">
-            P
+            S
           </span>
           <span className="hidden min-w-0 xl:block">
             <span className="block truncate text-[13px] font-semibold leading-tight tracking-[-0.01em] text-[var(--rail-text-strong)]">

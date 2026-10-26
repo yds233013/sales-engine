@@ -25,10 +25,10 @@ for (const file of [".env.local", ".env"]) {
   }
 }
 
-const BASE_URL = process.env.DATABASE_URL ?? "postgresql://localhost:5432/poka_sales_engine";
+const BASE_URL = process.env.DATABASE_URL ?? "postgresql://localhost:5432/sales_engine";
 const TEST_URL =
   process.env.TEST_DATABASE_URL ??
-  BASE_URL.replace(/\/([^/?]+)(\?|$)/, "/poka_sales_engine_test$2");
+  BASE_URL.replace(/\/([^/?]+)(\?|$)/, "/sales_engine_test$2");
 
 const TEST_DB_NAME = new URL(TEST_URL).pathname.slice(1);
 
@@ -51,7 +51,7 @@ function sql(adminUrl: string, statement: string, allowFailure = false) {
  * A lock turns that into one clear message instead of two mysteries.
  */
 function acquireLock(): () => void {
-  const lockPath = join(tmpdir(), `poka-integration-${TEST_DB_NAME}.lock`);
+  const lockPath = join(tmpdir(), `sales-engine-integration-${TEST_DB_NAME}.lock`);
   if (existsSync(lockPath)) {
     const raw = Number(readFileSync(lockPath, "utf8").trim());
     const alive = Number.isFinite(raw) && isRunning(raw);

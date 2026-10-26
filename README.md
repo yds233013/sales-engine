@@ -353,8 +353,8 @@ npm run dev                 # http://localhost:3000
 Already have PostgreSQL locally? Skip Docker, create a database and point `DATABASE_URL` at it:
 
 ```bash
-createdb poka_sales_engine
-# DATABASE_URL="postgresql://<you>@localhost:5432/poka_sales_engine?schema=public"
+createdb sales_engine
+# DATABASE_URL="postgresql://<you>@localhost:5432/sales_engine?schema=public"
 npm run db:setup && npm run dev
 ```
 

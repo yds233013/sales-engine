@@ -1,21 +1,21 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: poka-postgres
+    container_name: sales-engine-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: poka
-      POSTGRES_PASSWORD: poka
-      POSTGRES_DB: poka_sales_engine
+      POSTGRES_USER: sales_engine
+      POSTGRES_PASSWORD: sales_engine
+      POSTGRES_DB: sales_engine
     ports:
       - "5433:5432"
     volumes:
-      - poka-pgdata:/var/lib/postgresql/data
+      - sales-engine-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U poka -d poka_sales_engine"]
+      test: ["CMD-SHELL", "pg_isready -U sales_engine -d sales_engine"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  poka-pgdata:
+  sales-engine-pgdata:
