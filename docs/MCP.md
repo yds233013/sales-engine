@@ -34,7 +34,7 @@ painful to run inside a test. Swapping to stdio is a two-line change in
 flowchart LR
     AGENT[Adaptive runtime] -->|tools/call| CLIENT[MCP Client]
     CLIENT <-->|JSON-RPC| TRANSPORT[InMemoryTransport pair]
-    TRANSPORT <--> SERVER[McpServer<br/>15 registered tools]
+    TRANSPORT <--> SERVER[McpServer<br/>16 registered tools]
     SERVER --> VALIDATE[Zod input validation]
     VALIDATE --> HANDLER[Handler]
     HANDLER --> BUS[ToolBus<br/>persists every call]

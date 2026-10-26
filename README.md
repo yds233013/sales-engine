@@ -1,32 +1,35 @@
 # Sales Engine
 
-**Technical Sales Operations**
+[![CI](https://github.com/yds233013/sales-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/yds233013/sales-engine/actions/workflows/ci.yml)
 
-An AI-native technical-sales workspace that turns messy industrial requests into evidence-backed
-product recommendations, fulfillment plans and approval-gated commercial responses.
+Rep tooling for technical B2B sales: it turns an inbound customer request into a validated,
+priced, approval-gated quote, and gives the team one queue showing what is blocking each deal.
 
-**The agent decides what to investigate. Deterministic systems decide what is true.**
+**Live demo: [sales-engine.up.railway.app](https://sales-engine.up.railway.app)** — no login;
+start at [case REQ-2041](https://sales-engine.up.railway.app/cases/REQ-2041). The public demo is
+read-only and runs on synthetic data (an industrial pump distributor).
 
-**Live demo:** [sales-engine.up.railway.app](https://sales-engine.up.railway.app) ·
-start with [REQ-2041](https://sales-engine.up.railway.app/cases/REQ-2041) ·
-[reviewer guide](docs/REVIEWER_GUIDE.md) · [demo script](docs/DEMO.md)
+- **Ingest:** paste an email, portal or phone note; requirements are extracted with the sentence each came from.
+- **Validate:** every candidate product is checked against data-sheet values, with the citation, including the ones rejected.
+- **Plan and price:** available-to-promise across warehouses, freight, contract and volume pricing, margin.
+- **Gate:** discount, margin and substitution policy create approvals that block release until a person decides.
+- **Output:** a customer-ready draft with no internal cost or margin in it, plus an overview queue for the team.
 
-The public demo is read-only: every screen is browsable, but changes and live model runs are
-switched off so each visitor sees the same data. The live model results it shows are captured
-runs, labelled with model and date. Everything works when run locally.
-
-A model reads the customer's prose, chooses which tools to call and in what order, judges when it
-has enough evidence, and writes the explanation. It never decides whether a part is compatible,
-what is in stock, what something costs, or who has to approve it. Those answers come from engines
-that would give the same result with no model present at all — and a claim the engines did not
-produce is rejected before it reaches a customer.
-
-> **Independent technical-sales systems project, built with entirely synthetic industrial data.**
-> Every company, person, product, price, document and stock position is generated for this build.
-> No private company systems, data or architecture were involved, and it is not connected to any
-> real system.
+A Claude agent (optional) can choose what to investigate through 16 MCP tools; deterministic
+engines decide every price, stock figure, compatibility result and approval.
 
 ![The REQ-2041 case: PX-440 recommended in place of AX-220, which fails fluid temperature; 8 units from Dallas and 4 from Houston; $102,808.88; release blocked on three approvals](docs/assets/case-req-2041.png)
+
+**Stack:** Next.js 16, React 19, TypeScript, PostgreSQL + Prisma, Anthropic SDK, MCP, Vitest; deployed on Railway.
+
+```bash
+npm install && cp .env.example .env
+docker compose up -d && npm run db:setup   # Postgres on :5433, schema, seed
+npm run dev                                 # http://localhost:3000, no API key needed
+```
+
+More: [reviewer guide](docs/REVIEWER_GUIDE.md) · [demo script](docs/DEMO.md) ·
+[architecture](docs/ARCHITECTURE.md) · [evals](docs/EVALS.md) · [deployment](docs/DEPLOYMENT.md)
 
 <table>
 <tr>
@@ -38,11 +41,6 @@ produce is rejected before it reaches a customer.
 <td width="50%"><img src="docs/assets/evaluations.png" alt="Evaluations: 14 of 14 business outcomes correct, 13 of 14 full passes, zero safety violations"><br><sub><b>Evaluations.</b> 14/14 business outcomes, 13/14 full passes — reported as the different things they are — and the adversarial runs.</sub></td>
 </tr>
 </table>
-
-**Where to start:** open the [live demo](https://sales-engine.up.railway.app), or run it
-locally, and follow the suggested walkthrough from the Overview into REQ-2041. The
-[demo script](docs/DEMO.md) has a 60-second and a 3-minute version; reviewing the code, read the
-[reviewer guide](docs/REVIEWER_GUIDE.md) first. Deployment: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ---
 
