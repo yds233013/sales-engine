@@ -32,6 +32,20 @@ export interface ScenarioDef {
   demonstrates: string;
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * Resolve `{{DATE+N}}` placeholders to a calendar date N days after `now`
+ * (written the way a customer would, e.g. "Oct 12"), so a date-sensitive
+ * scenario means the same thing whenever the demo is seeded.
+ */
+export function renderScenarioBody(body: string, now: Date): string {
+  return body.replace(/\{\{DATE\+(\d+)\}\}/g, (_, days: string) => {
+    const d = new Date(now.getTime() + Number(days) * 86400000);
+    return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+  });
+}
+
 export const SCENARIOS: ScenarioDef[] = [
   {
     reference: "REQ-2041",
@@ -89,7 +103,7 @@ Plant Engineer, Cascade Foods`,
 
 Duty is 50 m3/h at 45 m head, hot oil at 190 C continuous. 316 stainless wetted parts, 460 V 3 phase 60 Hz supply. Piping isn't finalised yet so connection size is flexible at this stage.
 
-Quantity 10. Our shutdown window opens Oct 12 and everything has to be on site before then — that date does not move.
+Quantity 10. Our shutdown window opens {{DATE+21}} and everything has to be on site before then — that date does not move.
 
 Please come back with what you'd recommend and lead times.
 

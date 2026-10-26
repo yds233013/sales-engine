@@ -23,13 +23,13 @@ import {
   makeRandom,
 } from "./seed/commercial";
 import { CUSTOMERS, USERS } from "./seed/accounts";
-import { SCENARIOS } from "./seed/scenarios";
+import { SCENARIOS, renderScenarioBody } from "./seed/scenarios";
 import { runSalesRequest } from "../src/lib/agent/orchestrator";
 import { recordAudit } from "../src/lib/audit";
 
 const prisma = new PrismaClient();
 
-/** Fixed reference date so a re-seed produces identical dates everywhere. */
+/** One reference time (today, 09:00 UTC) so every seeded date is consistent and relative to the seed day. */
 const NOW = (() => {
   const d = new Date();
   d.setUTCHours(9, 0, 0, 0);
@@ -376,7 +376,7 @@ async function seedRequests() {
       data: {
         reference: scenario.reference,
         subject: scenario.subject,
-        rawBody: scenario.body,
+        rawBody: renderScenarioBody(scenario.body, NOW),
         channel: scenario.channel,
         status: "NEW",
         receivedAt,
