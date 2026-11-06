@@ -108,6 +108,8 @@ Running REQ-2041 adaptively produces the same quote as running it
 deterministically: PX-440 × 12, $102,808.88, 30.38% margin, three approvals.
 That equality is asserted in the test suite, not asserted here.
 
+How a measured failure became a fix that stays fixed: [`docs/AGENT_IMPROVEMENT.md`](docs/AGENT_IMPROVEMENT.md).
+
 See [`docs/AGENT_ARCHITECTURE.md`](docs/AGENT_ARCHITECTURE.md),
 [`docs/MCP.md`](docs/MCP.md) and [`docs/EVALS.md`](docs/EVALS.md).
 
@@ -192,7 +194,7 @@ executed trace, not a narration written afterwards. Chain-of-thought is never ca
 | `src/lib/workflow.ts` | Human transitions — approval decisions, quote release, response edits, case completion. Re-derives its own preconditions. |
 | `prisma/seed/` | The synthetic world: catalog generator, rules, documentation, commercial data, accounts, scenarios. |
 | `tests/unit/` | 276 tests over the engines, MCP contracts, guardrails, grounding and the scenario set, with no database. |
-| `tests/integration/` | 126 tests running the real orchestrator, the real MCP server and the adaptive runtime against a real seeded PostgreSQL database. |
+| `tests/integration/` | 135 tests running the real orchestrator, the real MCP server and the adaptive runtime against a real seeded PostgreSQL database. |
 
 **Where to look first**, if you are reviewing rather than running it:
 
@@ -396,8 +398,9 @@ No pricing, inventory, compatibility or approval decision passes through it.
 | `npm run db:seed` | Re-seed only (resets the demo to its starting state) |
 | `npm run db:studio` | Prisma Studio |
 | `npm run test:unit` | 276 engine, contract, guardrail, grounding and scenario tests; no database |
-| `npm run test:integration` | 126 tests against a throwaway seeded database |
+| `npm run test:integration` | 135 tests against a throwaway seeded database |
 | `npm run eval` | Evaluation suite, both modes, printed table |
+| `npm run experiment -- --label x --seeds 3` | Multi-seed experiment; `--compare a b` reports the delta and whether it beats noise |
 | `npm test` | Both suites |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
@@ -406,7 +409,7 @@ No pricing, inventory, compatibility or approval decision passes through it.
 
 ## 10. Testing
 
-**402 tests** — 276 unit, 126 integration. The split is deliberate: the engines take plain data and return plain data, never
+**411 tests** — 276 unit, 135 integration. The split is deliberate: the engines take plain data and return plain data, never
 importing Prisma, which is what makes it practical to write adversarial tests for pricing, ATP and
 approval policy without a fixture scaffold.
 

@@ -33,6 +33,7 @@ import type { HandlerContext } from "@/lib/mcp/handlers";
 import {
   applyToolResult,
   canDraftQuote,
+  canEscalateForReview,
   canRespondWithInformation,
   emptyState,
   narrateState,
@@ -347,6 +348,17 @@ export async function runAdaptiveLoop(
   const tracker = new GuardrailTracker(config);
 
   const request = await prisma.salesRequest.findUniqueOrThrow({ where: { id: requestId } });
+  // The parts the customer actually named, as the deterministic extractor
+  // recorded them. Read here rather than taken from the model's arguments, so
+  // the escalation gate cannot be satisfied by naming a different part.
+  const requestedSkus = (
+    await prisma.requestItem.findMany({
+      where: { requestId, productId: { not: null } },
+      select: { product: { select: { sku: true } } },
+    })
+  )
+    .map((item) => item.product?.sku)
+    .filter((sku): sku is string => Boolean(sku));
   const terminal: HandlerContext["terminal"] = { called: null, payload: null };
   const ctx: HandlerContext = { prisma, bus, requestId, asOf, terminal };
 
@@ -477,6 +489,18 @@ export async function runAdaptiveLoop(
             evidenceRefs: payload.evidenceRefs ?? [],
             skus: payload.skus ?? [],
           });
+          if (!ready.ok) {
+            tracker.record("FORBIDDEN_EFFECT", ready.reason);
+            results.push({ type: "tool_result", tool_use_id: use.id, is_error: true, content: ready.reason });
+            continue;
+          }
+        }
+
+        // Escalating is a claim about the catalog, so it carries the same
+        // kind of precondition as an informational answer: the requested part
+        // examined, and at least one search for an alternative.
+        if (use.name === "escalate_for_review") {
+          const ready = canEscalateForReview(state, { requestedSkus });
           if (!ready.ok) {
             tracker.record("FORBIDDEN_EFFECT", ready.reason);
             results.push({ type: "tool_result", tool_use_id: use.id, is_error: true, content: ready.reason });

@@ -25,7 +25,7 @@ import { takeLiveRunSlot } from "@/lib/ai/rate-limit";
 import { inferFromIncumbent } from "@/lib/ai/extract";
 import { recordAudit } from "@/lib/audit";
 import { ToolBus } from "@/lib/agent/toolbus";
-import { toProductView } from "@/lib/agent/mappers";
+import { toProductView, toRuleView } from "@/lib/agent/mappers";
 import {
   finalizeCase,
   finishAsInformationRequired,
@@ -36,6 +36,7 @@ import {
   type RunOutcome,
 } from "@/lib/agent/orchestrator";
 import { resolveCustomer, type SubstituteCandidate } from "@/lib/agent/tools";
+import { evaluateCandidate } from "@/lib/engines/compatibility";
 import {
   AnthropicModelClient,
   runAdaptiveLoop,
@@ -556,6 +557,48 @@ async function concludeRun(args: ConcludeArgs): Promise<AdaptiveOutcome> {
       },
     });
 
+    // Record what the run actually examined, the same way the fixed pipeline
+    // does. Without this the escalation produced a recommendation with no
+    // candidates at all: the engineer who picks the case up could not tell a
+    // part that was ruled out from one that was never opened, and the eval
+    // scored the case as thinner than the work that was really done. The
+    // verdicts are re-derived from the engine over stored specs, never taken
+    // from the model's account of them.
+    const examinedSkus = result.state.compatibility.map((c) => c.sku);
+    const examined = examinedSkus.length
+      ? await prisma.product.findMany({
+          where: { sku: { in: examinedSkus } },
+          include: PRODUCT_INCLUDE,
+        })
+      : [];
+    const rules = (await prisma.compatibilityRule.findMany({ orderBy: { code: "asc" } })).map(toRuleView);
+    const examinedCandidates = examined.map((row, index) => {
+      const verdict = evaluateCandidate(toProductView(row), requirements, rules);
+      const hardFailures = verdict.checks.filter((c) => c.result === "FAIL" && c.severity === "HARD");
+      return {
+        productId: row.id,
+        verdict: hardFailures.length > 0 ? ("REJECTED" as const) : ("REQUIRES_REVIEW" as const),
+        rank: index + 1,
+        reason:
+          hardFailures.length > 0
+            ? `Fails ${hardFailures.map((c) => c.dimension).join(", ")}.`
+            : "Examined during the investigation; no hard failure, but the case was escalated before selection.",
+        score: 0,
+        checks: {
+          create: verdict.checks.map((check) => ({
+            dimension: check.dimension,
+            label: check.label,
+            result: check.result,
+            severity: check.severity,
+            requirement: check.requirement,
+            actual: check.actual,
+            detail: check.detail,
+            ruleCode: check.ruleCode,
+          })),
+        },
+      };
+    });
+
     await prisma.recommendation.create({
       data: {
         requestId,
@@ -566,6 +609,7 @@ async function concludeRun(args: ConcludeArgs): Promise<AdaptiveOutcome> {
             : "Escalated for specialist review",
         rationale: payload.reason,
         risk: "BLOCKED",
+        candidates: { create: examinedCandidates },
       },
     });
     await finishRun(prisma, run.id, bus, args.startedAt, "COMPLETED");

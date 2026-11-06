@@ -48,3 +48,6 @@ next-env.d.ts
 /.claude/
 /CLAUDE.md
 /AGENTS.md
+
+# Experiment results are committed on purpose: a comparison months from now
+# should not depend on anyone still having the terminal output.

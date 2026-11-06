@@ -275,6 +275,37 @@ async function executeScenario(
 }
 
 /** Score a completed run by reading what it actually persisted. */
+/**
+ * Score a run that already happened.
+ *
+ * `runScenario` executes and scores in one call, which is what a suite wants.
+ * An environment (src/lib/rl/environment.ts) drives the episode itself and
+ * then needs the same verdict over the same checks, so the scoring half is
+ * available on its own. Both paths therefore produce comparable numbers,
+ * which is the only reason a reward from one can be set beside a pass rate
+ * from the other.
+ */
+export async function scoreCompletedRun(
+  prisma: PrismaClient,
+  scenario: EvalScenario,
+  requestId: string,
+  mode: EvalMode,
+  groundingIssues: string[] = [],
+  durationMs = 0,
+): Promise<EvalResult> {
+  const scored = await scoreRun(prisma, scenario, requestId, mode, groundingIssues, durationMs);
+  const failed = scored.checks.filter((c) => !c.passed);
+  return {
+    scenarioId: scenario.id,
+    title: scenario.title,
+    mode,
+    ...scored,
+    status: failed.length === 0 ? "PASS" : "FAIL",
+    notRunReason: null,
+    expectedGapReason: null,
+  };
+}
+
 async function scoreRun(
   prisma: PrismaClient,
   scenario: EvalScenario,

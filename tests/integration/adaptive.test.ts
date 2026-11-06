@@ -152,6 +152,7 @@ describe("adaptive investigation", () => {
     const result = await run(id, [
       { calls: [{ name: "get_request_state", input: {} }] },
       { calls: [{ name: "check_compatibility", input: { sku: "AX-240" } }] },
+      { calls: [{ name: "find_substitutes", input: { sku: "AX-240" } }] },
       { calls: [{ name: "check_compatibility", input: { sku: "MX-200" } }] },
       {
         calls: [
@@ -322,6 +323,99 @@ describe("guardrails in the loop", () => {
     expect(await db.quote.count({ where: { requestId: id } })).toBe(0);
   });
 
+  /**
+   * Live runs concluded "nothing in the catalog fits" without ever opening the
+   * part the customer asked about, which left an engineer unable to tell a
+   * rejected part from an unexamined one. The gate refuses that escalation and
+   * says what is missing; the run recovers by doing the work.
+   */
+  it("refuses to escalate before the requested part has been examined, then accepts it", async () => {
+    const id = await caseId("REQ-2026");
+    const result = await run(id, [
+      { calls: [{ name: "get_request_state", input: {} }] },
+      {
+        calls: [
+          {
+            name: "escalate_for_review",
+            input: { reason: "Nothing here will work.", blockingDimensions: ["material"] },
+          },
+        ],
+      },
+      { calls: [{ name: "check_compatibility", input: { sku: "AX-240" } }] },
+      {
+        calls: [
+          {
+            name: "escalate_for_review",
+            input: { reason: "Still nothing.", blockingDimensions: ["material"] },
+          },
+        ],
+      },
+      { calls: [{ name: "find_substitutes", input: { sku: "AX-240" } }] },
+      {
+        calls: [
+          {
+            name: "escalate_for_review",
+            input: {
+              reason: "Hastelloy C-276 at 150 C in Zone 0 is not met by any catalog product.",
+              blockingDimensions: ["material", "hazardous_area"],
+            },
+          },
+        ],
+      },
+    ]);
+
+    expect(result.termination).toBe("NEEDS_INTERNAL_REVIEW");
+
+    const run_ = await db.agentRun.findUniqueOrThrow({ where: { id: result.runId } });
+    const events = run_.guardrailEvents as { kind: string; detail?: string }[];
+    const refusals = events.filter((e) => e.kind === "FORBIDDEN_EFFECT");
+    expect(refusals.length).toBe(2);
+    expect(refusals[0].detail ?? "").toMatch(/check_compatibility/i);
+    expect(refusals[1].detail ?? "").toMatch(/find_substitutes|search_catalog/i);
+  });
+
+  /**
+   * The other half of the same failure: the escalation used to persist a
+   * recommendation with no candidates at all, so the work the run really did
+   * was invisible downstream and the eval scored it as thinner than it was.
+   */
+  it("records every part it examined when it escalates", async () => {
+    const id = await caseId("REQ-2026");
+    const result = await run(id, [
+      { calls: [{ name: "get_request_state", input: {} }] },
+      { calls: [{ name: "check_compatibility", input: { sku: "AX-240" } }] },
+      { calls: [{ name: "find_substitutes", input: { sku: "AX-240" } }] },
+      { calls: [{ name: "check_compatibility", input: { sku: "MX-200" } }] },
+      {
+        calls: [
+          {
+            name: "escalate_for_review",
+            input: {
+              reason: "No catalog product satisfies Hastelloy C-276 at 150 C in Zone 0.",
+              blockingDimensions: ["material", "hazardous_area"],
+            },
+          },
+        ],
+      },
+    ]);
+
+    expect(result.termination).toBe("NEEDS_INTERNAL_REVIEW");
+
+    const recommendation = await db.recommendation.findFirstOrThrow({
+      where: { requestId: id },
+      orderBy: { createdAt: "desc" },
+      include: { candidates: { include: { checks: true, product: true } } },
+    });
+    const skus = recommendation.candidates.map((c) => c.product.sku);
+    expect(skus).toContain("AX-240");
+    expect(skus).toContain("MX-200");
+
+    // The requested part carries a recorded reason, not just a verdict.
+    const requested = recommendation.candidates.find((c) => c.product.sku === "AX-240")!;
+    expect(requested.verdict).toBe("REJECTED");
+    expect(requested.checks.some((k) => k.result === "FAIL" && k.severity === "HARD")).toBe(true);
+  });
+
   it("handles a model that invents a tool name", async () => {
     const id = await ephemeralCase("Invented", "Please quote 5 x MX-160 for the Charlotte plant at 90 C.");
     const result = await runAdaptiveRequest(db, id, {
@@ -329,6 +423,7 @@ describe("guardrails in the loop", () => {
         { calls: [{ name: "approve_everything", input: {} }] },
         { calls: [{ name: "get_request_state", input: {} }] },
         { calls: [{ name: "check_compatibility", input: { sku: "MX-160" } }] },
+        { calls: [{ name: "find_substitutes", input: { sku: "MX-160" } }] },
         {
           calls: [
             {

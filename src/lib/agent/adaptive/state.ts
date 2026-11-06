@@ -49,6 +49,8 @@ export const investigationStateSchema = z.object({
   unresolvedSkus: z.array(z.string()),
   /** Products seen via catalog search or substitute discovery. */
   candidatesConsidered: z.array(z.string()),
+  /** How many times the catalog was screened for alternatives. */
+  screensRun: z.number().default(0),
   compatibility: z.array(compatibilityFindingSchema),
   inventoryChecked: z.array(z.object({ sku: z.string(), totalAvailable: z.number() })),
   fulfillmentPlans: z.array(
@@ -91,6 +93,7 @@ export function emptyState(requestId: string): InvestigationState {
     resolvedSkus: [],
     unresolvedSkus: [],
     candidatesConsidered: [],
+    screensRun: 0,
     compatibility: [],
     inventoryChecked: [],
     fulfillmentPlans: [],
@@ -152,6 +155,7 @@ export function applyToolResult(
     case "search_catalog": {
       const matches = read<{ sku: string }[]>("matches") ?? [];
       next.candidatesConsidered = unique([...next.candidatesConsidered, ...matches.map((m) => m.sku)]);
+      next.screensRun += 1;
       break;
     }
     case "get_product": {
@@ -167,6 +171,7 @@ export function applyToolResult(
         ...curated.map((c) => c.sku),
         ...screened.map((s) => s.sku),
       ]);
+      next.screensRun += 1;
       break;
     }
     case "search_technical_docs": {
@@ -367,6 +372,54 @@ export function canRespondWithInformation(
     return {
       ok: false,
       reason: `${unchecked.join(", ")} was never looked up in this run. Call resolve_sku or check_compatibility before answering about it.`,
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Whether this run has earned the right to escalate.
+ *
+ * "Nothing in the catalog meets this" is a claim about the catalog, and an
+ * escalation that skips the part the customer actually named leaves the
+ * weakest possible audit record: an engineer picks the case up and cannot see
+ * whether the requested part was ruled out or merely never opened. Live runs
+ * did exactly that — concluding correctly, on fewer candidates than the fixed
+ * pipeline records, and differently from one run to the next.
+ *
+ * So the gate asks for the two things that make the conclusion checkable: the
+ * requested part went through compatibility, and the catalog was screened for
+ * alternatives at least once. Both are satisfiable with one tool call each,
+ * and a screen that returns nothing still satisfies the second — the agent is
+ * never trapped, only kept honest.
+ */
+export function canEscalateForReview(
+  state: InvestigationState,
+  input: { requestedSkus: string[] },
+): { ok: true } | { ok: false; reason: string } {
+  if (!state.requirementsLoaded) {
+    return { ok: false, reason: "The case requirements have not been read. Call get_request_state first." };
+  }
+
+  const checked = new Set(state.compatibility.map((c) => c.sku.toUpperCase()));
+  // A part that does not exist cannot be checked, and saying so is a result.
+  const missing = new Set(state.unresolvedSkus.map((s) => s.toUpperCase()));
+  const unexamined = input.requestedSkus.filter(
+    (sku) => !checked.has(sku.toUpperCase()) && !missing.has(sku.toUpperCase()),
+  );
+  if (unexamined.length > 0) {
+    return {
+      ok: false,
+      reason: `${unexamined.join(", ")} is the part the customer asked about and it has not been through check_compatibility in this run. Check it before concluding the requirement cannot be met — the engineer picking this up needs to see why it was ruled out.`,
+    };
+  }
+
+  if (state.screensRun === 0) {
+    return {
+      ok: false,
+      reason:
+        "No alternative has been looked for yet. Run find_substitutes or search_catalog before concluding nothing in the catalog fits; an empty result is a legitimate answer, not looking is not.",
     };
   }
 
